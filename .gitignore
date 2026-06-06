@@ -1,6 +1,6 @@
 __pycache__/
 venv/
 *.pyc
-chromedb/
+chroma_db/
 *.db
 *.sqlite
