@@ -4,4 +4,3 @@ venv/
 chroma_db/
 *.db
 *.sqlitevenv/
-chroma_db/
