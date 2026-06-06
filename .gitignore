@@ -3,4 +3,5 @@ venv/
 *.pyc
 chroma_db/
 *.db
-*.sqlite
+*.sqlitevenv/
+chroma_db/
