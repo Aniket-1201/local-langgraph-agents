@@ -4,3 +4,4 @@ venv/
 chroma_db/
 *.db
 *.sqlitevenv/
+.env
