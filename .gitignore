@@ -3,5 +3,8 @@ venv/
 *.pyc
 chroma_db/
 *.db
-*.sqlitevenv/
+*.sqlite
 .env
+# AI Models and Weights
+*.gguf
+Modelfile

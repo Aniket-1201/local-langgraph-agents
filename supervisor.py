@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from langgraph.graph import StateGraph, START, END
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import PromptTemplate
-
+from sql_agent import execute_sql_query
 # Load the LangSmith API keys from your .env file
 load_dotenv()
 
@@ -54,8 +54,12 @@ def rag_node(state: GraphState):
 
 def sql_node(state: GraphState):
     print("--- 📊 ROUTED TO SQL ---")
-    # This is a "Mock Node". We will swap this with Aniket's sql_agent.py logic later!
-    return {"final_answer": "I am the SQL node. I will search the SQLite DB for your answer."}
+    question = state["question"]
+    
+    # Run Aniket's Qwen Database logic!
+    answer = execute_sql_query(question) 
+    
+    return {"final_answer": answer}
 
 # 3. Define the Conditional Routing Logic
 def route_question(state: GraphState):
@@ -93,15 +97,20 @@ def build_graph():
 def main():
     app = build_graph()
     
-    # Test 1: A question meant for Aniket's database
-    print("\n=== TEST 1: SQL Routing ===")
-    result1 = app.invoke({"question": "How many active employees do we have in the Eng_Sys_Ops department?"})
-    print(f"Final Answer: {result1.get('final_answer')}")
+    # Test A: Checking for complex casing and fuzzy matching
+    print("\n=== STRESS TEST A ===")
+    result_a = app.invoke({"question": "Give me a list of anyone whose status is listed as 'ACTIVE' but write their names in all uppercase."})
+    print(f"Final Answer: {result_a.get('final_answer')}") # <-- Added print
     
-    # Test 2: A question meant for your RAG PDFs
-    print("\n=== TEST 2: RAG Routing ===")
-    result2 = app.invoke({"question": "What are the three primary tool types?"})
-    print(f"Final Answer: {result2.get('final_answer')}")
+    # Test B: Requesting columns or concepts that don't exist in the schema
+    print("\n=== STRESS TEST B ===")
+    result_b = app.invoke({"question": "Who is the highest-paid manager in the Eng_Sys_Ops division?"}) 
+    print(f"Final Answer: {result_b.get('final_answer')}") # <-- Added print
 
+    # Test C: Ambiguous routing request
+    print("\n=== STRESS TEST C ===")
+    result_c = app.invoke({"question": "Can you check the company policy PDF to see how we calculate employee salaries, and then check the database to see who matches that criteria?"})
+    print(f"Final Answer: {result_c.get('final_answer')}") # <-- Added print
+    
 if __name__ == "__main__":
     main()
