@@ -5,6 +5,8 @@ from langgraph.graph import StateGraph, START, END
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import PromptTemplate
 from sql_agent import execute_sql_query
+from langchain_chroma import Chroma
+from langchain_ollama import OllamaEmbeddings
 # Load the LangSmith API keys from your .env file
 load_dotenv()
 
@@ -49,8 +51,33 @@ def supervisor_node(state: GraphState):
 
 def rag_node(state: GraphState):
     print("--- 📄 ROUTED TO RAG ---")
-    # This is a "Mock Node". We will swap this with your query.py logic later!
-    return {"final_answer": "I am the RAG node. I will search the PDFs for your answer."}
+    question = state["question"]
+    
+    # 1. Connect to your existing ChromaDB
+    embeddings = OllamaEmbeddings(model="all-minilm")
+    vector_store = Chroma(
+        persist_directory="chroma_db",
+        embedding_function=embeddings,
+        collection_name="corporate_policies"
+    )
+    
+    # 2. Search for the relevant PDF chunks
+    retrieved_docs = vector_store.similarity_search(question, k=3)
+    context_text = "\n\n".join([doc.page_content for doc in retrieved_docs])
+    
+    # 3. Ask Llama 3.2 to answer based on the PDF
+    llm = ChatOllama(model="llama3.2:3b", temperature=0)
+    prompt_template = PromptTemplate.from_template(
+        "You are a helpful enterprise AI assistant. Answer the user's question using ONLY the context provided below.\n\n"
+        "Context:\n{context}\n\n"
+        "Question: {question}\n\n"
+        "Answer:"
+    )
+    
+    final_prompt = prompt_template.format(context=context_text, question=question)
+    response = llm.invoke(final_prompt)
+    
+    return {"final_answer": response.content}
 
 def sql_node(state: GraphState):
     print("--- 📊 ROUTED TO SQL ---")
