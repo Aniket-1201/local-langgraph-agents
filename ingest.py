@@ -1,34 +1,47 @@
 import os
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-# NEW IMPORTS: Using the modern, dedicated packages to clear the warnings
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 
-DATA_PATH = "data/Newwhitepaper_Agents2.pdf"
+DATA_DIR = "data"
 DB_DIR = "chroma_db"
 
 def main():
-    if not os.path.exists(DATA_PATH):
-        print(f"Error: Please place a PDF named {DATA_PATH} in the 'data/' folder.")
+    if not os.path.exists(DATA_DIR):
+        print(f"Error: The '{DATA_DIR}' folder does not exist.")
         return
 
-    print("Loading PDF document...")
-    loader = PyPDFLoader(DATA_PATH)
-    documents = loader.load()
-    print(f"Loaded {len(documents)} pages.")
+    documents = []
+    
+    # 1. Iterate through every PDF in the data folder
+    for filename in os.listdir(DATA_DIR):
+        if filename.endswith(".pdf"):
+            file_path = os.path.join(DATA_DIR, filename)
+            try:
+                print(f"Loading {filename}...")
+                loader = PyPDFLoader(file_path)
+                documents.extend(loader.load())
+            except Exception as e:
+                # This prevents the crash we saw earlier!
+                print(f"⚠️ Skipping corrupted file {filename}: {e}")
 
-    # FIX: Reduced chunk size from 1000 to 500 characters.
-    # This ensures no chunk ever exceeds all-minilm's strict 256-token limit.
+    if not documents:
+        print("No documents loaded. Please check your data folder.")
+        return
+
+    print(f"Total pages loaded: {len(documents)}.")
+
+    # 2. Split text
     print("Splitting text into chunks...")
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=500, 
         chunk_overlap=50
     )
     chunks = text_splitter.split_documents(documents)
-    print(f"Split the document into {len(chunks)} distinct chunks.")
+    print(f"Split document into {len(chunks)} distinct chunks.")
 
+    # 3. Embed and Save
     print("Initializing embedding model (all-minilm)...")
     embedding_model = OllamaEmbeddings(model="all-minilm")
 
@@ -40,7 +53,7 @@ def main():
         collection_name="corporate_policies" 
     )
     
-    print(f"Success! Vector database saved locally to the '{DB_DIR}' folder.")
+    print(f"Success! Vector database saved to '{DB_DIR}'.")
 
 if __name__ == "__main__":
     main()

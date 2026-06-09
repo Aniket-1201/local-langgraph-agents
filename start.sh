@@ -1,21 +1,38 @@
 #!/bin/bash
+set -e
+echo "--- DEBUG: Current directory ---"
+pwd
+echo "--- DEBUG: Files present ---"
+ls -lh
+echo "--- DEBUG: Modelfile contents ---"
+cat Modelfile
 
-# 1. Start the Ollama daemon in the background
 echo "Starting Ollama server..."
 ollama serve &
 
-# 2. Wait for the Ollama server to boot up before sending commands
 echo "Waiting for Ollama to initialize..."
-sleep 10
+sleep 15
 
-# 3. Pull the Llama 3.2 router model
+# ✅ ADD THIS BLOCK - Download gguf from HF Model Hub
+echo "Downloading fine-tuned model from HF Hub..."
+hf download AniketDeshpande1201/corporate-sql-brain \
+  qwen2.5-coder-3b-instruct.Q4_K_M.gguf \
+  --local-dir .
+
 echo "Pulling llama3.2:3b for the Supervisor Node..."
 ollama pull llama3.2:3b
 
-# 4. Ingest your fine-tuned Qwen model using the Modelfile
-echo "Creating custom-sql-brain..."
+echo "Pulling all-minilm embedding model..."
+ollama pull all-minilm
+
+echo "Creating custom-sql-brain from Modelfile..."
 ollama create custom-sql-brain -f Modelfile
 
-# 5. Start the FastAPI server on Hugging Face's required port (7860)
+echo "Setting up SQLite database..."
+python setup_db.py
+
+echo "Building vector database..."
+python ingest.py
+
 echo "Starting FastAPI server..."
 uvicorn main:app --host 0.0.0.0 --port 7860
