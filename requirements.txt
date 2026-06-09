@@ -1,14 +1,15 @@
-﻿pydantic==2.12.5
-fastapi
-uvicorn
-langgraph
-langchain
-langchain-community
-langchain-ollama
-langchain-chroma
-chromadb
-sqlalchemy
-python-dotenv
+﻿# pydantic==2.12.5
+# fastapi
+# uvicorn
+# langgraph
+# langchain
+# langchain-community
+# langchain-ollama
+# langchain-chroma
+# chromadb
+# sqlalchemy
+# python-dotenv
+# pypdf
+# huggingface-hub
+streamlit
 requests
-pypdf
-huggingface-hub
