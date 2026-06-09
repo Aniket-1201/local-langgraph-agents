@@ -27,9 +27,11 @@ def supervisor_node(state: GraphState):
     
     # We give the LLM strict instructions on how to categorize questions
     prompt = PromptTemplate.from_template(
-        "You are an intelligent routing supervisor. Route the user's question to the correct expert system.\n"
-        "If the question is about corporate policies, tools, or whitepapers, reply strictly with 'RAG'.\n"
-        "If the question is about active employees, salaries, departments, or database metrics, reply strictly with 'SQL'.\n\n"
+        "You are an intelligent routing supervisor. Your job is to classify the user's question into one of three categories: 'SQL', 'RAG', or 'CHAT'.\n\n"
+        "Rules:\n"
+        "1. Reply strictly with 'SQL' if the question asks about active employees, salaries, departments, or database metrics.\n"
+        "2. Reply strictly with 'RAG' if the question asks about corporate policies, company tools, GenAI whitepapers, or document summaries.\n"
+        "3. Reply strictly with 'CHAT' if the question is a standard greeting (e.g., 'hello'), general conversation, or a question completely unrelated to company data.\n\n"
         "Question: {question}\n"
         "Route:"
     )
@@ -39,12 +41,13 @@ def supervisor_node(state: GraphState):
     decision = response.content.strip().upper()
     
     # Clean up the output to ensure exact routing match
+    # Clean up the output to ensure exact routing match
     if "RAG" in decision:
         route = "RAG"
     elif "SQL" in decision:
         route = "SQL"
     else:
-        route = "RAG" # Fallback if it gets confused
+        route = "CHAT" # Fallback to normal conversation if confused
         
     print(f"Decision Made: Sending to -> {route}")
     return {"route": route}
@@ -88,6 +91,16 @@ def sql_node(state: GraphState):
     
     return {"final_answer": answer}
 
+def chat_node(state: GraphState):
+    print("--- 💬 ROUTED TO CHAT ---")
+    question = state["question"]
+    
+    # Use the lightweight model for general conversation
+    llm = ChatOllama(model="llama3.2:3b", temperature=0.7)
+    response = llm.invoke(question)
+    
+    return {"final_answer": response.content}
+
 # 3. Define the Conditional Routing Logic
 def route_question(state: GraphState):
     # LangGraph uses this function to read the state and choose the next node
@@ -97,27 +110,30 @@ def route_question(state: GraphState):
 def build_graph():
     workflow = StateGraph(GraphState)
     
-    # Add our three nodes to the graph
+    # Add our FOUR nodes to the graph
     workflow.add_node("supervisor", supervisor_node)
     workflow.add_node("rag", rag_node)
     workflow.add_node("sql", sql_node)
+    workflow.add_node("chat", chat_node) # <-- New node registered
     
-    # Draw the edges (how the data flows)
+    # Draw the edges
     workflow.add_edge(START, "supervisor")
     
-    # The conditional edge reads the 'route_question' function and branches accordingly
+    # Update the conditional edge mapping
     workflow.add_conditional_edges(
         "supervisor",
         route_question,
         {
             "RAG": "rag",
-            "SQL": "sql"
+            "SQL": "sql",
+            "CHAT": "chat" # <-- New route mapped
         }
     )
     
-    # End the graph after the experts respond
+    # End the graph after any expert responds
     workflow.add_edge("rag", END)
     workflow.add_edge("sql", END)
+    workflow.add_edge("chat", END) # <-- Close the new route
     
     return workflow.compile()
 
