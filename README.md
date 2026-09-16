@@ -6,6 +6,63 @@
 This repository contains a full-stack, decoupled AI microservice that implements a stateful, multi-agent routing architecture. The system acts as an enterprise copilot, utilizing a zero-shot local LLM to dynamically classify user intent and route execution to specialized nodes (Retrieval-Augmented Generation, Text-to-SQL, or General Chat). 
 
 Designed to operate entirely on localized and open-source models, this architecture handles complex hardware constraints (RAM swapping on CPU tiers) through asynchronous frontend protocols and strict containerization.
+## ⚙️ Installation & Setup
+
+### Prerequisites
+* **Git**
+* **Python 3.10+**
+* **[Ollama](https://ollama.com/)** installed and running locally
+
+---
+
+### 1. Clone the Repository
+```bash
+git clone [https://github.com/Aniket-1201/local-langgraph-agents.git](https://github.com/Aniket-1201/local-langgraph-agents.git)
+cd local-langgraph-agents
+
+### 2. Set Up Virtual Environment
+# macOS/Linux
+python3 -m venv venv
+source venv/bin/activate
+
+# Windows (Command Prompt)
+python -m venv venv
+venv\Scripts\activate
+
+### 3. Install Dependencies
+pip install --upgrade pip
+pip install -r requirements.txt (check the requirements file before this)
+
+
+### 4. Pull Ollama Models & Embeddings
+Ensure Ollama is running in the background, then pull the necessary models:
+# Supervisor & general routing LLM
+ollama pull llama3.2:3b
+
+# Sentence transformer for ChromaDB vector embeddings
+ollama pull all-minilm
+
+### 5. Initialize Database & Vector Store
+Run the setup scripts to populate the local SQLite database and embed the PDFs located in /data:
+
+Bash
+# Initialize SQLite database with corporate employee metrics
+python setup_db.py
+
+# Chunk 42-page enterprise PDFs & build local ChromaDB store
+python ingest.py
+
+Terminal 1 — FastAPI Backend Engine:
+
+Bash
+python main.py
+# Server runs on http://localhost:8000
+
+Terminal 2 — Streamlit UI Frontend:
+
+Bash
+streamlit run app.py
+# Access app in your browser at http://localhost:8501
 
 ---
 
