@@ -25,7 +25,7 @@ def main():
                 print(f"Loading {filename}...")
                 loader = PyPDFLoader(file_path)
                 documents.extend(loader.load())
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 # This prevents the crash we saw earlier!
                 print(f"⚠️ Skipping corrupted file {filename}: {e}")
 

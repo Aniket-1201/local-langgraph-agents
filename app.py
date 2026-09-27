@@ -57,7 +57,7 @@ if prompt := st.chat_input("Ask a question (e.g., 'What are the 3 tool types?' o
                 final_response = api_request.json()["response"]
             except requests.exceptions.Timeout:
                 final_response = "⚠️ The request timed out. The backend is taking longer than usual."
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 final_response = f"⚠️ Failed to connect to Corporate Brain Backend: {e}"
             
             st.markdown(final_response)
