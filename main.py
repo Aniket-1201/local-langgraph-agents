@@ -2,10 +2,10 @@ import os
 from fastapi import FastAPI
 from pydantic import BaseModel
 from supervisor import build_graph
-
+from langsmith import Client
 # 1. Initialize the API
 app = FastAPI(title="Corporate Brain AI Backend")
-
+client = Client()
 # 2. Build your LangGraph once when the server starts
 agent_graph = build_graph()
 
@@ -18,6 +18,18 @@ class ChatRequest(BaseModel):
 def health_check():
     return {"status": "online", "message": "Dual-Agent LangGraph is active."}
 
+@app.post("/api/chat")
+async def chat_endpoint(request: ChatRequest):
+    # Run your LangGraph multi-agent system
+    # Depending on how you invoke, you can extract the run_id
+    response_data = await agent_graph.ainvoke({"messages": [request.question]})
+    
+    # LangChain/LangGraph usually returns the run_id in the config or response metadata
+    # Return it to Streamlit so the user can hit a "thumbs up/down" button
+    return {
+        "response": response_data,
+        "run_id": "captured_run_id_here" 
+    }
 # 5. Create the main Chat Endpoint
 @app.post("/api/chat")
 def chat_endpoint(request: ChatRequest):

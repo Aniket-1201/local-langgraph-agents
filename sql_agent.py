@@ -2,6 +2,7 @@ import re
 from langchain_community.utilities import SQLDatabase
 from langchain_classic.chains import create_sql_query_chain
 from langchain_ollama import ChatOllama
+from langsmith import traceable
 
 def extract_sql(llm_text: str) -> str:
     # First try the SQLQuery: marker
@@ -18,6 +19,7 @@ def extract_sql(llm_text: str) -> str:
     
     return llm_text
 
+@traceable(run_type="tool", name="SQLite_DB_Execution")
 def execute_sql_query(user_question: str) -> str:
     db_uri = "sqlite:///db/corporate.db"
     db = SQLDatabase.from_uri(db_uri)

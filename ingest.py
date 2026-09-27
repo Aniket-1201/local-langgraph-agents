@@ -3,10 +3,12 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
+from langsmith import traceable
 
 DATA_DIR = "data"
 DB_DIR = "chroma_db"
 
+@traceable(run_type="chain", name="RAG_Data_Ingestion_Pipeline")
 def main():
     if not os.path.exists(DATA_DIR):
         print(f"Error: The '{DATA_DIR}' folder does not exist.")
