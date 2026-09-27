@@ -1,4 +1,9 @@
-﻿pydantic==2.12.5
+﻿# --- Frontend (Streamlit) ---
+streamlit
+requests
+
+# --- Backend (Hugging Face / LangGraph / DB) ---
+pydantic==2.12.5
 fastapi
 uvicorn
 langgraph
@@ -11,5 +16,4 @@ sqlalchemy
 python-dotenv
 pypdf
 huggingface-hub
-requests
 langsmith>=0.1.0
