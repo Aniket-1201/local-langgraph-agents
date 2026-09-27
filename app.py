@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import requests
 
@@ -26,7 +27,6 @@ st.markdown("Ask questions about GENAI (PDFs) or database metrics (SQL).")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display previous chat messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -34,30 +34,32 @@ for message in st.session_state.messages:
 # 4. User Input
 if prompt := st.chat_input("Ask a question (e.g., 'What are the 3 tool types?' or 'How many employees in Eng_Sys_Ops?'):"):
     
-    # Show user message
     with st.chat_message("user"):
         st.markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
-    # Show AI thinking animation
     with st.chat_message("assistant"):
         with st.spinner("AI is routing your question..."):
             
-            # Live Production API URL pointing to Aniket's backend Space
-            API_URL = "https://AniketDeshpande1201-Space-deployment.hf.space/api/chat"
-            payload = {"question": prompt}
+            # UPGRADE: Configurable API URL via environment variables
+            DEFAULT_URL = "https://AniketDeshpande1201-Space-deployment.hf.space/api/chat"
+            API_URL = os.getenv("API_URL", DEFAULT_URL)
+            
+            # UPGRADE: Pass the conversation history along with the prompt
+            payload = {
+                "question": prompt,
+                "history": st.session_state.messages # Send history to backend
+            }
             
             try:
-                # Call the dual-agent routing backend
                 api_request = requests.post(API_URL, json=payload, timeout=500)
                 api_request.raise_for_status()
                 final_response = api_request.json()["response"]
             except requests.exceptions.Timeout:
-                final_response = "⚠️ The request timed out. The backend is taking longer than usual to route this query."
+                final_response = "⚠️ The request timed out. The backend is taking longer than usual."
             except Exception as e:
                 final_response = f"⚠️ Failed to connect to Corporate Brain Backend: {e}"
             
             st.markdown(final_response)
             
-    # Save AI response
     st.session_state.messages.append({"role": "assistant", "content": final_response})

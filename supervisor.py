@@ -1,5 +1,6 @@
 import os
 from typing_extensions import TypedDict
+from typing import List, Dict, Any
 from dotenv import load_dotenv
 from langgraph.graph import StateGraph, START, END
 from langchain_ollama import ChatOllama
@@ -7,47 +8,60 @@ from langchain_core.prompts import PromptTemplate
 from sql_agent import execute_sql_query
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
-# Load the LangSmith API keys from your .env file
+
 load_dotenv()
 
-# 1. Define the Graph State
-# This dictionary tracks variables as they move through our node pipeline
+# UPGRADE 1: Singleton Pattern (Initialize AI once at startup)
+ROUTING_LLM = ChatOllama(model="llama3.2:3b", temperature=0)
+CHAT_LLM = ChatOllama(model="llama3.2:3b", temperature=0.7)
+EMBEDDINGS = OllamaEmbeddings(model="all-minilm")
+
+try:
+    VECTOR_STORE = Chroma(
+        persist_directory="chroma_db",
+        embedding_function=EMBEDDINGS,
+        collection_name="corporate_policies"
+    )
+except Exception as e:
+    print(f"Warning: Could not connect to ChromaDB: {e}")
+    VECTOR_STORE = None
+
+# UPGRADE 2: Add Conversation Memory to GraphState
 class GraphState(TypedDict):
     question: str
+    history: List[Dict[str, Any]] # Stores past conversation turns
     route: str
     final_answer: str
 
-# 2. Define the Nodes
+# UPGRADE 3: Graceful Error Handling inside Nodes
 def supervisor_node(state: GraphState):
     print("\n--- 🧠 SUPERVISOR THINKING ---")
     question = state["question"]
     
-    # We use your lightweight Mac-friendly model for routing
-    llm = ChatOllama(model="llama3.2:3b", temperature=0)
-    
-    # We give the LLM strict instructions on how to categorize questions
-    prompt = PromptTemplate.from_template(
-        "You are an intelligent routing supervisor. Your job is to classify the user's question into one of three categories: 'SQL', 'RAG', or 'CHAT'.\n\n"
-        "Rules:\n"
-        "1. Reply strictly with 'SQL' if the question asks about active employees, salaries, departments, or database metrics.\n"
-        "2. Reply strictly with 'RAG' if the question asks about corporate policies, company tools, GenAI whitepapers, or document summaries.\n"
-        "3. Reply strictly with 'CHAT' if the question is a standard greeting (e.g., 'hello'), general conversation, or a question completely unrelated to company data.\n\n"
-        "Question: {question}\n"
-        "Route:"
-    )
-    
-    # Ask the LLM to make a routing decision
-    response = llm.invoke(prompt.format(question=question))
-    decision = response.content.strip().upper()
-    
-    # Clean up the output to ensure exact routing match
-    # Clean up the output to ensure exact routing match
-    if "RAG" in decision:
-        route = "RAG"
-    elif "SQL" in decision:
-        route = "SQL"
-    else:
-        route = "CHAT" # Fallback to normal conversation if confused
+    try:
+        prompt = PromptTemplate.from_template(
+            "You are an intelligent routing supervisor. Your job is to classify the user's question into one of three categories: 'SQL', 'RAG', or 'CHAT'.\n\n"
+            "Rules:\n"
+            "1. Reply strictly with 'SQL' if the question asks about active employees, salaries, departments, or database metrics.\n"
+            "2. Reply strictly with 'RAG' if the question asks about corporate policies, company tools, GenAI whitepapers, or document summaries.\n"
+            "3. Reply strictly with 'CHAT' if the question is a standard greeting (e.g., 'hello'), general conversation, or a question completely unrelated to company data.\n\n"
+            "Question: {question}\n"
+            "Route:"
+        )
+        
+        response = ROUTING_LLM.invoke(prompt.format(question=question))
+        decision = response.content.strip().upper()
+        
+        if "RAG" in decision:
+            route = "RAG"
+        elif "SQL" in decision:
+            route = "SQL"
+        else:
+            route = "CHAT"
+            
+    except Exception as e:
+        print(f"Supervisor Error: {e}")
+        route = "CHAT" # Safe fallback if the LLM crashes
         
     print(f"Decision Made: Sending to -> {route}")
     return {"route": route}
@@ -56,104 +70,81 @@ def rag_node(state: GraphState):
     print("--- 📄 ROUTED TO RAG ---")
     question = state["question"]
     
-    # 1. Connect to your existing ChromaDB
-    embeddings = OllamaEmbeddings(model="all-minilm")
-    vector_store = Chroma(
-        persist_directory="chroma_db",
-        embedding_function=embeddings,
-        collection_name="corporate_policies"
-    )
-    
-    # 2. Search for the relevant PDF chunks
-    retrieved_docs = vector_store.similarity_search(question, k=3)
-    context_text = "\n\n".join([doc.page_content for doc in retrieved_docs])
-    
-    # 3. Ask Llama 3.2 to answer based on the PDF
-    llm = ChatOllama(model="llama3.2:3b", temperature=0)
-    prompt_template = PromptTemplate.from_template(
-        "You are a helpful enterprise AI assistant. Answer the user's question using ONLY the context provided below.\n\n"
-        "Context:\n{context}\n\n"
-        "Question: {question}\n\n"
-        "Answer:"
-    )
-    
-    final_prompt = prompt_template.format(context=context_text, question=question)
-    response = llm.invoke(final_prompt)
-    
-    return {"final_answer": response.content}
+    try:
+        if not VECTOR_STORE:
+            return {"final_answer": "⚠️ Error: The Document Database is currently offline."}
+            
+        retrieved_docs = VECTOR_STORE.similarity_search(question, k=3)
+        context_text = "\n\n".join([doc.page_content for doc in retrieved_docs])
+        
+        prompt_template = PromptTemplate.from_template(
+            "You are a helpful enterprise AI assistant. Answer the user's question using ONLY the context provided below.\n\n"
+            "Context:\n{context}\n\n"
+            "Question: {question}\n\n"
+            "Answer:"
+        )
+        
+        final_prompt = prompt_template.format(context=context_text, question=question)
+        response = ROUTING_LLM.invoke(final_prompt)
+        return {"final_answer": response.content}
+        
+    except Exception as e:
+        return {"final_answer": f"⚠️ RAG Pipeline Error: {str(e)}"}
 
 def sql_node(state: GraphState):
     print("--- 📊 ROUTED TO SQL ---")
     question = state["question"]
     
-    # Run Aniket's Qwen Database logic!
-    answer = execute_sql_query(question) 
-    
-    return {"final_answer": answer}
+    try:
+        answer = execute_sql_query(question) 
+        return {"final_answer": answer}
+    except Exception as e:
+        return {"final_answer": f"⚠️ SQL Pipeline Error: {str(e)}"}
 
 def chat_node(state: GraphState):
     print("--- 💬 ROUTED TO CHAT ---")
     question = state["question"]
+    history = state.get("history", [])
     
-    # Use the lightweight model for general conversation
-    llm = ChatOllama(model="llama3.2:3b", temperature=0.7)
-    response = llm.invoke(question)
-    
-    return {"final_answer": response.content}
+    try:
+        # Extract the last 3 messages to give the LLM basic context
+        history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history[-3:]])
+        context_prompt = f"Previous conversation:\n{history_text}\n\nUser: {question}\nAI:" if history else question
+        
+        response = CHAT_LLM.invoke(context_prompt)
+        return {"final_answer": response.content}
+        
+    except Exception as e:
+        return {"final_answer": f"⚠️ Chat Pipeline Error: {str(e)}"}
 
-# 3. Define the Conditional Routing Logic
 def route_question(state: GraphState):
-    # LangGraph uses this function to read the state and choose the next node
     return state["route"]
 
-# 4. Build the State Machine Graph
 def build_graph():
     workflow = StateGraph(GraphState)
-    
-    # Add our FOUR nodes to the graph
     workflow.add_node("supervisor", supervisor_node)
     workflow.add_node("rag", rag_node)
     workflow.add_node("sql", sql_node)
-    workflow.add_node("chat", chat_node) # <-- New node registered
+    workflow.add_node("chat", chat_node) 
     
-    # Draw the edges
     workflow.add_edge(START, "supervisor")
-    
-    # Update the conditional edge mapping
     workflow.add_conditional_edges(
         "supervisor",
         route_question,
-        {
-            "RAG": "rag",
-            "SQL": "sql",
-            "CHAT": "chat" # <-- New route mapped
-        }
+        {"RAG": "rag", "SQL": "sql", "CHAT": "chat"}
     )
     
-    # End the graph after any expert responds
     workflow.add_edge("rag", END)
     workflow.add_edge("sql", END)
-    workflow.add_edge("chat", END) # <-- Close the new route
+    workflow.add_edge("chat", END) 
     
     return workflow.compile()
 
 def main():
     app = build_graph()
-    
-    # Test A: Checking for complex casing and fuzzy matching
-    print("\n=== STRESS TEST A ===")
-    result_a = app.invoke({"question": "Give me a list of anyone whose status is listed as 'ACTIVE' but write their names in all uppercase."})
-    print(f"Final Answer: {result_a.get('final_answer')}") # <-- Added print
-    
-    # Test B: Requesting columns or concepts that don't exist in the schema
-    print("\n=== STRESS TEST B ===")
-    result_b = app.invoke({"question": "Who is the highest-paid manager in the Eng_Sys_Ops division?"}) 
-    print(f"Final Answer: {result_b.get('final_answer')}") # <-- Added print
+    test_state = {"question": "Hello! How are you?", "history": []}
+    result = app.invoke(test_state)
+    print(f"Final Answer: {result.get('final_answer')}")
 
-    # Test C: Ambiguous routing request
-    print("\n=== STRESS TEST C ===")
-    result_c = app.invoke({"question": "Can you check the company policy PDF to see how we calculate employee salaries, and then check the database to see who matches that criteria?"})
-    print(f"Final Answer: {result_c.get('final_answer')}") # <-- Added print
-    
 if __name__ == "__main__":
     main()
