@@ -1,5 +1,5 @@
-import sqlite3
 import os
+import sqlite3
 
 # Ensure the db folder exists
 os.makedirs("db", exist_ok=True)

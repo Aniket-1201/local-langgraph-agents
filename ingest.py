@@ -1,8 +1,9 @@
 import os
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 from langchain_chroma import Chroma
+from langchain_community.document_loaders import PyPDFLoader
 from langchain_ollama import OllamaEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langsmith import traceable
 
 DATA_DIR = "data"
@@ -48,7 +49,7 @@ def main():
     embedding_model = OllamaEmbeddings(model="all-minilm")
 
     print("Converting text to vectors and saving to ChromaDB...")
-    vector_store = Chroma.from_documents(
+    Chroma.from_documents(
         documents=chunks,
         embedding=embedding_model,
         persist_directory=DB_DIR,

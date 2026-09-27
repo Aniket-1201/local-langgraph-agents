@@ -1,13 +1,13 @@
-import os
-from typing_extensions import TypedDict
-from typing import List, Dict, Any
+from typing import Any
+
 from dotenv import load_dotenv
-from langgraph.graph import StateGraph, START, END
-from langchain_ollama import ChatOllama
-from langchain_core.prompts import PromptTemplate
-from sql_agent import execute_sql_query
 from langchain_chroma import Chroma
-from langchain_ollama import OllamaEmbeddings
+from langchain_core.prompts import PromptTemplate
+from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langgraph.graph import END, START, StateGraph
+from typing_extensions import TypedDict
+
+from sql_agent import execute_sql_query
 
 load_dotenv()
 
@@ -22,14 +22,14 @@ try:
         embedding_function=EMBEDDINGS,
         collection_name="corporate_policies"
     )
-except Exception as e:
+except Exception as e:  # noqa: BLE001
     print(f"Warning: Could not connect to ChromaDB: {e}")
     VECTOR_STORE = None
 
 # UPGRADE 2: Add Conversation Memory to GraphState
 class GraphState(TypedDict):
     question: str
-    history: List[Dict[str, Any]] # Stores past conversation turns
+    history: list[dict[str, Any]] # Stores past conversation turns
     route: str
     final_answer: str
 
@@ -59,7 +59,7 @@ def supervisor_node(state: GraphState):
         else:
             route = "CHAT"
             
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Supervisor Error: {e}")
         route = "CHAT" # Safe fallback if the LLM crashes
         
@@ -88,8 +88,8 @@ def rag_node(state: GraphState):
         response = ROUTING_LLM.invoke(final_prompt)
         return {"final_answer": response.content}
         
-    except Exception as e:
-        return {"final_answer": f"⚠️ RAG Pipeline Error: {str(e)}"}
+    except Exception as e:  # noqa: BLE001
+        return {"final_answer": f"⚠️ RAG Pipeline Error: {e!s}"}
 
 def sql_node(state: GraphState):
     print("--- 📊 ROUTED TO SQL ---")
@@ -98,8 +98,8 @@ def sql_node(state: GraphState):
     try:
         answer = execute_sql_query(question) 
         return {"final_answer": answer}
-    except Exception as e:
-        return {"final_answer": f"⚠️ SQL Pipeline Error: {str(e)}"}
+    except Exception as e:  # noqa: BLE001
+        return {"final_answer": f"⚠️ SQL Pipeline Error: {e!s}"}
 
 def chat_node(state: GraphState):
     print("--- 💬 ROUTED TO CHAT ---")
@@ -114,8 +114,8 @@ def chat_node(state: GraphState):
         response = CHAT_LLM.invoke(context_prompt)
         return {"final_answer": response.content}
         
-    except Exception as e:
-        return {"final_answer": f"⚠️ Chat Pipeline Error: {str(e)}"}
+    except Exception as e:  # noqa: BLE001
+        return {"final_answer": f"⚠️ Chat Pipeline Error: {e!s}"}
 
 def route_question(state: GraphState):
     return state["route"]

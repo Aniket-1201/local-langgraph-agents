@@ -1,6 +1,7 @@
 import os
-import streamlit as st
+
 import requests
+import streamlit as st
 
 # 1. Page Configuration
 st.set_page_config(page_title="Corporate Brain AI", page_icon="🧠", layout="centered")
@@ -38,9 +39,8 @@ if prompt := st.chat_input("Ask a question (e.g., 'What are the 3 tool types?' o
         st.markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
-    with st.chat_message("assistant"):
-        with st.spinner("AI is routing your question..."):
-            
+    with st.chat_message("assistant"), st.spinner("AI is routing your question..."):
+             
             # UPGRADE: Configurable API URL via environment variables
             DEFAULT_URL = "https://AniketDeshpande1201-Space-deployment.hf.space/api/chat"
             API_URL = os.getenv("API_URL", DEFAULT_URL)

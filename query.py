@@ -1,6 +1,6 @@
 from langchain_chroma import Chroma
-from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_core.prompts import PromptTemplate
+from langchain_ollama import ChatOllama, OllamaEmbeddings
 
 # 1. Setup the exact same models used in ingestion
 EMBEDDING_MODEL = "all-minilm"
@@ -22,7 +22,7 @@ def main():
     
     # 2. Perform the Search
     # CHANGE THIS QUESTION TO MATCH YOUR 42 PAGES OF PDF DATA!
-    question = question = "According to the document, what are the three primary tool types that Google models are able to interact with?"
+    question = "According to the document, what are the three primary tool types that Google models are able to interact with?"
     print(f"\nSearching for answers to: '{question}'\n")
     
     # Get the top 3 most relevant chunks from the database

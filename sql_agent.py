@@ -1,8 +1,10 @@
 import re
-from langchain_community.utilities import SQLDatabase
+
 from langchain_classic.chains import create_sql_query_chain
+from langchain_community.utilities import SQLDatabase
 from langchain_ollama import ChatOllama
 from langsmith import traceable
+
 
 def extract_sql(llm_text: str) -> str:
     # First try the SQLQuery: marker
@@ -44,7 +46,7 @@ def execute_sql_query(user_question: str) -> str:
     try:
         result = db.run(clean_query)
         return f"Database Result: {result}"
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return f"Error executing SQL: {e}"
     
 def main():
@@ -72,7 +74,7 @@ def main():
         result = db.run(clean_query)
         print("\n--- SQLITE EXECUTION RESULT ---")
         print(result)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"\nError executing SQL: {e}")
 
 if __name__ == "__main__":
